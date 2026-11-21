@@ -1,0 +1,5 @@
+name: KehlLibExample
+version: '1.0'
+main: dev.kehlchen.lib.example.ExamplePlugin
+api-version: '26.3'
+depend: [KehlLib]

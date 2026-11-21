@@ -1,0 +1,5 @@
+name: KehlLib
+version: '${version}'
+main: dev.kehlchen.lib.plugin.KehlLibPlugin
+api-version: '26.3'
+load: POSTWORLD

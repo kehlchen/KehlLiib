@@ -485,3 +485,7 @@ must be tested in the target deployment environment.
 ## Standalone plugin
 
 Install the `plugin` JAR on a Paper or Purpur server. Other plugins can depend on `KehlLib` and integrate through their own plugin APIs. The standalone JAR does not need to be combined with an embedded core copy.
+
+## Documentation
+
+Start with the [documentation index](docs/README.md). It contains installation and setup guides, architecture, API references, integration instructions, compatibility notes, examples, configuration guidance, and troubleshooting.

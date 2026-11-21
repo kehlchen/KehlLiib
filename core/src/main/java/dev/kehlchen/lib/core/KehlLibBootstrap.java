@@ -10,7 +10,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Central bootstrap for deterministic module lifecycle management. */
+/**
+ * Owns the lifecycle of registered modules, services, event subscriptions, and resources.
+ * <p>
+ * Modules are enabled in registration order and disabled in reverse enable order.
+ * Call {@link #close()} from plugin shutdown; it is safe to call more than once.
+ * </p>
+ */
 public final class KehlLibBootstrap implements AutoCloseable {
     private final Map<String, Lifecycle> modules = new LinkedHashMap<>();
     private final Map<String, LifecycleState> states = new LinkedHashMap<>();

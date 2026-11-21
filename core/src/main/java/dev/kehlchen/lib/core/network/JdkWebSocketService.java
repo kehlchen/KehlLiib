@@ -313,6 +313,10 @@ public final class JdkWebSocketService implements WebSocketService {
             if (current == null) {
                 status = WebSocketStatus.CLOSED;
                 connections.remove(this);
+                if (!firstConnection.isDone()) {
+                    firstConnection.complete(Result.failure(
+                            new IllegalStateException("WebSocket connection closed before opening")));
+                }
                 return CompletableFuture.completedFuture(null);
             }
             return current.sendClose(code, reason).thenApply(ignored -> {

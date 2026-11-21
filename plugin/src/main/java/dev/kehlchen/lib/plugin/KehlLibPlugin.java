@@ -56,6 +56,24 @@ import dev.kehlchen.lib.api.location.LocationService;
 import dev.kehlchen.lib.api.entity.EntityService;
 import dev.kehlchen.lib.api.particle.ParticleService;
 import dev.kehlchen.lib.api.effects.EffectService;
+import dev.kehlchen.lib.api.packet.PacketService;
+import dev.kehlchen.lib.api.virtual.VirtualEntityService;
+import dev.kehlchen.lib.api.virtual.VirtualBlockService;
+import dev.kehlchen.lib.api.virtual.HologramService;
+import dev.kehlchen.lib.api.profiling.Profiler;
+import dev.kehlchen.lib.api.metrics.Metrics;
+import dev.kehlchen.lib.api.monitor.PerformanceMonitor;
+import dev.kehlchen.lib.api.diagnostics.Diagnostics;
+import dev.kehlchen.lib.api.nms.ServerAdapterRegistry;
+import dev.kehlchen.lib.core.packet.PacketServiceImpl;
+import dev.kehlchen.lib.core.virtual.PaperVirtualEntityService;
+import dev.kehlchen.lib.core.virtual.PaperVirtualBlockService;
+import dev.kehlchen.lib.core.virtual.InMemoryHologramService;
+import dev.kehlchen.lib.core.profiling.SimpleProfiler;
+import dev.kehlchen.lib.core.metrics.InMemoryMetrics;
+import dev.kehlchen.lib.core.monitor.PaperPerformanceMonitor;
+import dev.kehlchen.lib.core.diagnostics.CoreDiagnostics;
+import dev.kehlchen.lib.core.nms.CoreServerAdapterRegistry;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.logging.Level;
@@ -91,6 +109,15 @@ public final class KehlLibPlugin extends JavaPlugin {
             IntegrationRegistryImpl integrations = new IntegrationRegistryImpl();
             JsonSerialization json = new JsonSerialization();
             HttpWebhookService webhooks = new HttpWebhookService(http, json);
+            PacketServiceImpl packets = new PacketServiceImpl();
+            PaperVirtualEntityService virtualEntities = new PaperVirtualEntityService(4096);
+            PaperVirtualBlockService virtualBlocks = new PaperVirtualBlockService(this, scheduler, 4096);
+            InMemoryHologramService holograms = new InMemoryHologramService(virtualEntities);
+            SimpleProfiler profiler = new SimpleProfiler();
+            InMemoryMetrics metrics = new InMemoryMetrics();
+            PaperPerformanceMonitor performance = new PaperPerformanceMonitor(this, scheduler);
+            CoreDiagnostics diagnostics = new CoreDiagnostics(bootstrap.services());
+            CoreServerAdapterRegistry adapters = new CoreServerAdapterRegistry();
             bootstrap.register(scheduler);
             bootstrap.register(players);
             bootstrap.register(messaging);
@@ -110,6 +137,15 @@ public final class KehlLibPlugin extends JavaPlugin {
             bootstrap.register(webSockets);
             bootstrap.register(pluginMessages);
             bootstrap.register(integrations);
+            bootstrap.register(packets);
+            bootstrap.register(virtualEntities);
+            bootstrap.register(virtualBlocks);
+            bootstrap.register(holograms);
+            bootstrap.register(profiler);
+            bootstrap.register(metrics);
+            bootstrap.register(performance);
+            bootstrap.register(diagnostics);
+            bootstrap.register(adapters);
             bootstrap.services().register(Scheduler.class, scheduler);
             bootstrap.services().register(PlayerService.class, players);
             bootstrap.services().register(Messaging.class, messaging);
@@ -131,6 +167,15 @@ public final class KehlLibPlugin extends JavaPlugin {
             bootstrap.services().register(IntegrationRegistry.class, integrations);
             bootstrap.services().register(WebhookService.class, webhooks);
             bootstrap.services().register(JsonSerialization.class, json);
+            bootstrap.services().register(PacketService.class, packets);
+            bootstrap.services().register(VirtualEntityService.class, virtualEntities);
+            bootstrap.services().register(VirtualBlockService.class, virtualBlocks);
+            bootstrap.services().register(HologramService.class, holograms);
+            bootstrap.services().register(Profiler.class, profiler);
+            bootstrap.services().register(Metrics.class, metrics);
+            bootstrap.services().register(PerformanceMonitor.class, performance);
+            bootstrap.services().register(Diagnostics.class, diagnostics);
+            bootstrap.services().register(ServerAdapterRegistry.class, adapters);
             DatabaseFactory databases = config -> {
                 Database database = new JdbcDatabaseFactory().create(config);
                 bootstrap.resources().register(database);
@@ -158,7 +203,14 @@ public final class KehlLibPlugin extends JavaPlugin {
             getLogger().info("KehlLib core runtime enabled");
         } catch (RuntimeException failure) {
             getLogger().log(Level.SEVERE, "KehlLib failed to enable", failure);
-            bootstrap = null;
+            try {
+                bootstrap.close();
+            } catch (RuntimeException closeFailure) {
+                failure.addSuppressed(closeFailure);
+                getLogger().log(Level.SEVERE, "KehlLib failed to clean up after enable failure", closeFailure);
+            } finally {
+                bootstrap = null;
+            }
             getServer().getPluginManager().disablePlugin(this);
         }
     }

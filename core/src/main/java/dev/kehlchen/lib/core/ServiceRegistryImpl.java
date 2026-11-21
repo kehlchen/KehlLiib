@@ -9,10 +9,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /** Concurrent implementation of {@link ServiceRegistry}. */
 public final class ServiceRegistryImpl implements ServiceRegistry {
     private final Map<Class<?>, Object> services = new ConcurrentHashMap<>();
-    private volatile boolean closed;
+    private boolean closed;
 
     @Override
-    public <T> void register(Class<T> type, T implementation) {
+    public synchronized <T> void register(Class<T> type, T implementation) {
         ensureOpen();
         services.put(java.util.Objects.requireNonNull(type, "type"),
                 java.util.Objects.requireNonNull(implementation, "implementation"));
@@ -35,7 +35,7 @@ public final class ServiceRegistryImpl implements ServiceRegistry {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         closed = true;
         services.clear();
     }

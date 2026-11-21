@@ -20,7 +20,7 @@ public final class KehlLibBootstrap implements AutoCloseable {
     private final EventBusImpl eventBus = new EventBusImpl();
     private boolean closed;
 
-    public void register(Lifecycle module) {
+    public synchronized void register(Lifecycle module) {
         ensureOpen();
         Objects.requireNonNull(module, "module");
         if (modules.putIfAbsent(module.name(), module) != null) {
@@ -29,7 +29,7 @@ public final class KehlLibBootstrap implements AutoCloseable {
         states.put(module.name(), LifecycleState.REGISTERED);
     }
 
-    public void enableAll() {
+    public synchronized void enableAll() {
         ensureOpen();
         for (Lifecycle module : modules.values()) {
             if (states.get(module.name()) == LifecycleState.ENABLED) {
@@ -47,7 +47,7 @@ public final class KehlLibBootstrap implements AutoCloseable {
         }
     }
 
-    public void disableAll() {
+    public synchronized void disableAll() {
         disableEnabledModules();
     }
 
@@ -72,7 +72,7 @@ public final class KehlLibBootstrap implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         if (closed) {
             return;
         }

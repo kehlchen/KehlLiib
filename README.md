@@ -238,6 +238,58 @@ Add only the integration artifacts you use. Vault API and Velocity API are provi
 their respective runtime and are not bundled. The Velocity artifact is installed on
 Velocity; do not install it as a Paper plugin.
 
+## Phase 8 modules
+
+- Backend-neutral packet listening/sending under `dev.kehlchen.lib.api.packet`
+- Virtual entity and hologram state plus optional packet backends under
+  `dev.kehlchen.lib.api.virtual`
+- Public-Bukkit-API fake block changes under `core.virtual.PaperVirtualBlockService`
+- Performance snapshots, thread-safe profiling, opt-in metrics and diagnostics
+- Isolated version-adapter registry under `dev.kehlchen.lib.api.nms`
+
+The standalone plugin registers `PacketService`, `VirtualEntityService`,
+`VirtualBlockService`, `HologramService`, `Profiler`, `Metrics`,
+`PerformanceMonitor`, `Diagnostics`, and `ServerAdapterRegistry`.
+
+Packet interception and modification are not available through Bukkit/Paper alone.
+Registering an optional backend is explicit; when no backend is present, packet
+operations return a clear `UnsupportedOperationException`. Fake entity and hologram
+packet delivery also requires an optional virtual entity backend. Fake block changes
+use `Player.sendBlockChange`, do not alter the real world, restore automatically on
+expiry and are bounded by a configurable limit.
+
+Packet and virtual backends must not leak internal Minecraft/NMS types through public
+API contracts. NMS adapters are only enabled for exact adapters that explicitly
+advertise support for the detected Minecraft version.
+
+```java
+PacketService packets = runtime.services().getRequired(PacketService.class);
+Result<Void> packet = packets.send(player.getUniqueId(),
+    PacketDirection.CLIENTBOUND, "example", new MapPacket(Map.of("value", 1)));
+
+Profiler profiler = runtime.services().getRequired(Profiler.class);
+profiler.setEnabled(true);
+profiler.measure("database-refresh", () -> refreshDatabase());
+
+Metrics metrics = runtime.services().getRequired(Metrics.class);
+metrics.counter("example.requests", 1);
+
+PerformanceMonitor monitor =
+    runtime.services().getRequired(PerformanceMonitor.class);
+PerformanceSnapshot snapshot = monitor.snapshot();
+```
+
+TPS/MSPT are returned only when the server exposes them through a supported API.
+If unavailable, `OptionalDouble.empty()` is used. CPU process-load values may also
+be unavailable and are reported as `-1` rather than guessed. A CPU value from `0`
+through `100` is the measured process-load percentage.
+
+Folia: fake block updates are scheduled for each player's entity ownership. Packet
+callbacks and packet backend implementations must remain thread-safe and perform
+Bukkit entity/world access only with region or entity ownership. Virtual entity and
+packet interception compatibility require a tested backend; no Folia compatibility is
+claimed by default.
+
 ### HTTP and JSON
 
 ```java
@@ -421,7 +473,14 @@ The project uses Gradle Kotlin DSL and Java 25.
 ```powershell
 .\gradlew.bat test
 .\gradlew.bat :plugin:build
+.\gradlew.bat build
+.\gradlew.bat publishToMavenLocal
 ```
+
+Before a release, run the complete build and inspect the API, core, plugin, and example
+plugin JARs plus the generated Maven publications. Real Paper/Purpur/Folia runtime
+behavior, credentials, Redis, Vault, proxy, packet backends, and external network services
+must be tested in the target deployment environment.
 
 ## Standalone plugin
 

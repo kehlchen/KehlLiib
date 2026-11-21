@@ -9,9 +9,9 @@ import java.util.Objects;
 /** Closes registered resources in reverse registration order. */
 public final class ResourceManagerImpl implements AutoCloseable {
     private final Deque<Resource> resources = new ArrayDeque<>();
-    private volatile boolean closed;
+    private boolean closed;
 
-    public void register(Resource resource) {
+    public synchronized void register(Resource resource) {
         if (closed) {
             throw new IllegalStateException("Resource manager is closed");
         }
@@ -19,7 +19,7 @@ public final class ResourceManagerImpl implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         if (closed) {
             return;
         }

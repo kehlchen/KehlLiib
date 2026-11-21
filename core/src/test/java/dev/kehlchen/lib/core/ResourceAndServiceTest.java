@@ -31,4 +31,24 @@ class ResourceAndServiceTest {
 
         assertEquals("value", registry.getRequired(String.class));
     }
+
+    @Test
+    void repeatedCloseIsSafeAndRejectsLateResources() {
+        ResourceManagerImpl resources = new ResourceManagerImpl();
+        resources.close();
+        resources.close();
+
+        assertThrows(IllegalStateException.class,
+                () -> resources.register((Resource) () -> { }));
+    }
+
+    @Test
+    void closingServiceRegistryRejectsLateRegistration() {
+        ServiceRegistryImpl registry = new ServiceRegistryImpl();
+        registry.close();
+        registry.close();
+
+        assertThrows(IllegalStateException.class,
+                () -> registry.register(String.class, "late"));
+    }
 }

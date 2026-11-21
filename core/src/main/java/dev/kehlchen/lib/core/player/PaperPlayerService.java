@@ -4,6 +4,7 @@ import dev.kehlchen.lib.api.player.CompletablePlayerPreferences;
 import dev.kehlchen.lib.api.player.OfflinePlayerView;
 import dev.kehlchen.lib.api.player.OnlinePlayer;
 import dev.kehlchen.lib.api.player.PlayerProfile;
+import dev.kehlchen.lib.api.player.PlayerPersistence;
 import dev.kehlchen.lib.api.player.PlayerService;
 import dev.kehlchen.lib.core.scheduler.PaperScheduler;
 import org.bukkit.Bukkit;
@@ -29,6 +30,7 @@ import java.util.concurrent.Executors;
 public final class PaperPlayerService implements PlayerService, Listener {
     private final Plugin plugin;
     private final PaperScheduler scheduler;
+    private final PlayerPersistence persistence;
     private final Executor io = Executors.newCachedThreadPool(runnable -> {
         Thread thread = new Thread(runnable, "kehllib-player-data");
         thread.setDaemon(true);
@@ -41,8 +43,13 @@ public final class PaperPlayerService implements PlayerService, Listener {
     private volatile Duration afkThreshold = Duration.ofMinutes(5);
 
     public PaperPlayerService(Plugin plugin, PaperScheduler scheduler) {
+        this(plugin, scheduler, null);
+    }
+
+    public PaperPlayerService(Plugin plugin, PaperScheduler scheduler, PlayerPersistence persistence) {
         this.plugin = plugin;
         this.scheduler = scheduler;
+        this.persistence = persistence;
     }
 
     /** Sets the AFK threshold. */
@@ -128,9 +135,21 @@ public final class PaperPlayerService implements PlayerService, Listener {
             Player player = Bukkit.getPlayer(uuid);
             return player != null && player.isOnline();
         }
-        @Override public boolean isFirstJoin() { return firstJoin.getOrDefault(uuid, false); }
+        @Override public boolean isFirstJoin() {
+            return persistence == null
+                    ? firstJoin.getOrDefault(uuid, false)
+                    : persistence.cached(uuid).map(data -> data.firstJoin())
+                            .orElseGet(() -> firstJoin.getOrDefault(uuid, false));
+        }
         @Override public Duration playtime() {
             Session session = sessions.get(uuid);
+            if (persistence != null) {
+                Optional<dev.kehlchen.lib.api.player.PersistentPlayerData> data = persistence.cached(uuid);
+                if (data.isPresent()) {
+                    Duration total = Duration.ofMillis(data.get().totalPlaytimeMillis());
+                    return session == null ? total : total.plus(Duration.between(session.joined, Instant.now()));
+                }
+            }
             if (session == null) {
                 org.bukkit.OfflinePlayer offline = Bukkit.getOfflinePlayer(uuid);
                 return Duration.ofMillis(Math.max(0L, offline.getLastPlayed() - offline.getFirstPlayed()));
@@ -169,11 +188,18 @@ public final class PaperPlayerService implements PlayerService, Listener {
         private final UUID uuid;
         private PaperPreferences(UUID uuid) { this.uuid = uuid; }
         @Override public CompletableFuture<String> getString(String key, String defaultValue) {
+            if (persistence != null) {
+                return persistence.load(uuid)
+                        .thenApply(data -> data.preferences().getOrDefault(key, defaultValue));
+            }
             return CompletableFuture.supplyAsync(() ->
                     preferences.computeIfAbsent(uuid, ignored -> new ConcurrentHashMap<>())
                             .getOrDefault(key, defaultValue), io);
         }
         @Override public CompletableFuture<Void> setString(String key, String value) {
+            if (persistence != null) {
+                return persistence.update(uuid, data -> data.withPreference(key, value)).thenApply(ignored -> null);
+            }
             return CompletableFuture.runAsync(() ->
                     preferences.computeIfAbsent(uuid, ignored -> new ConcurrentHashMap<>()).put(key, value), io);
         }

@@ -24,6 +24,10 @@ tasks {
         dependsOn(":api:jar", ":core:jar")
         from(project(":api").extensions.getByType<SourceSetContainer>()["main"].output)
         from(project(":core").extensions.getByType<SourceSetContainer>()["main"].output)
+        from(configurations.runtimeClasspath.get().filter { it.isFile && it.name.endsWith(".jar") }
+            .map { zipTree(it) })
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "module-info.class")
     }
 
     processResources {
